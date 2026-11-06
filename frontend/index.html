@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le mie attività</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="testata"><div>
+  <h1>Le mie attività</h1>
+  <p>Aggiungi le attività, decidi le priorità con una barra e scarica il file. Oppure carica un riepilogo creato da <code>python main.py</code>.</p>
+</div></header>
+
+<main>
+  <section class="pannello nuova">
+    <h2>Nuova attività</h2>
+    <form id="nuova" novalidate>
+      <div class="campi">
+        <label class="campo">Titolo <input id="f-titolo" type="text" autocomplete="off"></label>
+        <label class="campo">Argomento <input id="f-argomento" type="text" placeholder="generale" autocomplete="off"></label>
+        <label class="campo">Priorità <output id="f-out">3</output>
+          <input id="f-priorita" type="range" min="1" max="5" step="1" value="3"></label>
+        <label class="campo">Data <input id="f-data" type="date"></label>
+        <label class="campo">Minuti <input id="f-minuti" type="number" min="1" step="1" inputmode="numeric"></label>
+        <button class="aggiungi" type="submit">Aggiungi attività</button>
+      </div>
+      <p id="f-msg" role="status"></p>
+    </form>
+  </section>
+
+  <div id="contenuto" hidden>
+    <section class="pannello riga-stat">
+      <div class="anello" id="anello"><div><span><strong id="perc"></strong><br><small>completato</small></span></div></div>
+      <div class="indicatori" id="indicatori"></div>
+    </section>
+
+    <section class="pannello argomenti">
+      <h2>Per argomento</h2>
+      <div id="argomenti"></div>
+    </section>
+
+    <section class="pannello elenco">
+      <h2>Attività</h2>
+      <div class="strumenti">
+        <div class="filtri" id="filtri">
+          <button type="button" data-f="tutte" aria-pressed="true">Tutte</button>
+          <button type="button" data-f="da_fare" aria-pressed="false">Da fare</button>
+          <button type="button" data-f="completate" aria-pressed="false">Completate</button>
+        </div>
+        <input type="search" id="cerca" placeholder="Cerca titolo o argomento" aria-label="Cerca">
+        <select id="ordina" aria-label="Ordina per">
+          <option value="file">Ordine del riepilogo</option>
+          <option value="priorita">Priorità più alta</option>
+          <option value="data">Data più vicina</option>
+        </select>
+        <button class="scarica" id="scarica" type="button">Scarica attivita.json</button>
+      </div>
+      <p class="nota">Sposta la barra per decidere la priorità (1-5) trascina una riga di lato per eliminarla e usa «Modifica» per cambiare qualunque dato. Poi scarica il file e mettilo in <code>data/</code> al posto di <code>attivita.json</code>.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Attività</th><th>Argomento</th><th>Priorità</th><th>Data</th><th>Minuti</th><th>Stato</th><th></th></tr></thead>
+          <tbody id="righe"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section class="pannello">
+    <label class="carica" id="zona">
+      <strong>Scegli o trascina qui report.json</strong>
+      <span>Sostituisce l'elenco attuale. Lo trovi in <code>output/</code> dopo «Riepilogo ed esporta»</span>
+      <input id="file" type="file" accept=".json">
+    </label>
+    <p id="messaggio" role="status"></p>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" hidden><span>Attività eliminata.</span><button id="annulla" type="button">Annulla</button></div>
+
+<script>
+const CAMPI = ["titolo", "argomento", "priorita", "data", "minuti", "completata"];
+const $ = s => document.querySelector(s);
+const OGGI = new Date().toLocaleDateString("sv-SE"); // AAAA-MM-GG
+const SOGLIA = 120; // pixel di trascinamento oltre i quali si elimina
+let attivita = [], stato = "tutte", ultima = null, timer;
+
+function el(tag, testo, classe) {
+  const e = document.createElement(tag);
+  if (testo !== undefined) e.textContent = testo;
+  if (classe) e.className = classe;
+  return e;
+}
+function errore(testo) {
+  $("#messaggio").textContent = testo;
+  $("#messaggio").className = "errore";
+}
+function verifica(report) {
+  if (typeof report !== "object" || report === null || !Array.isArray(report.attivita))
+    throw new Error("manca l'elenco «attivita»: carica il file creato dal riepilogo.");
+  for (const a of report.attivita) {
+    for (const c of CAMPI)
+      if (!(c in a)) throw new Error("un'attività non ha il campo «" + c + "».");
+    if (!Number.isInteger(a.priorita) || a.priorita < 1 || a.priorita > 5)
+      throw new Error("la priorità di «" + a.titolo + "» deve essere un numero da 1 a 5.");
+  }
+}
+function indicatore(etichetta, valore, classe) {
+  const d = el("div", undefined, classe);
+  d.append(el("strong", valore), el("span", etichetta));
+  return d;
+}
+function disegnaArgomenti(per) {
+  const box = $("#argomenti");
+  box.replaceChildren();
+  const voci = Object.entries(per || {});
+  if (!voci.length) { box.append(el("p", "Nessun argomento.", "vuoto")); return; }
+  for (const [nome, v] of voci) {
+    const riga = el("div", undefined, "argomento");
+    const traccia = el("div", undefined, "traccia"), riempi = el("i");
+    riempi.style.width = (v.totale ? v.completate / v.totale * 100 : 0) + "%";
+    traccia.append(riempi);
+    riga.append(el("span", nome, "nome"), traccia, el("span", v.completate + "/" + v.totale + " · " + v.minuti + " min", "dettaglio"));
+    box.append(riga);
+  }
+}
+function visibili() {
+  const q = $("#cerca").value.trim().toLowerCase();
+  const lista = attivita.filter(a =>
+    (stato === "tutte" || (stato === "completate") === a.completata) &&
+    (!q || (a.titolo + " " + a.argomento).toLowerCase().includes(q)));
+  const o = $("#ordina").value;
+  if (o === "priorita") lista.sort((x, y) => y.priorita - x.priorita);
+  if (o === "data") lista.sort((x, y) => String(x.data).localeCompare(String(y.data)));
+  return lista;
+}
+function disegnaTabella() {
+  const corpo = $("#righe");
+  corpo.replaceChildren();
+  const lista = visibili();
+  if (!lista.length) {
+    const vuota = corpo.insertRow();
+    vuota.className = "vuota";
+    const td = vuota.insertCell();
+    td.colSpan = 7; td.className = "vuoto";
+    td.textContent = "Nessuna attività in questo elenco.";
+    return;
+  }
+  for (const a of lista) {
+    const tr = corpo.insertRow();
+    tr.className = a.completata ? "fatta" : "";
+    tr.style.setProperty("--p", a.priorita);
+    tr.insertCell().textContent = a.titolo;
+    tr.insertCell().textContent = a.argomento;
+    const barra = el("input");
+    barra.type = "range"; barra.min = 1; barra.max = 5; barra.step = 1; barra.value = a.priorita;
+    barra.setAttribute("aria-label", "Priorità di " + a.titolo);
+    const numero = el("output", a.priorita);
+    barra.addEventListener("input", () => {
+      a.priorita = Number(barra.value);
+      numero.textContent = a.priorita;
+      tr.style.setProperty("--p", a.priorita);
+    });
+    tr.insertCell().append(barra, numero);
+    tr.insertCell().textContent = a.data;
+    tr.insertCell().textContent = a.minuti;
+    const tag = a.completata ? el("span", "completata", "tag fatto")
+      : a.data < OGGI ? el("span", "in ritardo", "tag ritardo") : el("span", "da fare", "tag");
+    tr.insertCell().append(tag);
+    const del = el("button", "Elimina", "elimina");
+    del.type = "button";
+    del.setAttribute("aria-label", "Elimina " + a.titolo);
+    del.addEventListener("click", () => elimina(a));
+    const mod = el("button", "Modifica", "modifica");
+    mod.type = "button";
+    mod.setAttribute("aria-label", "Modifica " + a.titolo);
+    mod.addEventListener("click", () => rigaModifica(tr, a));
+    const azioni = tr.insertCell();
+    azioni.className = "azioni";
+    azioni.append(mod, del);
+    trascinaPerEliminare(tr, a);
+  }
+}
+
+function rigaModifica(tr, a) {
+  const riga = el("tr", undefined, "inModifica");
+  riga.style.setProperty("--p", a.priorita);
+  const campo = (tipo, valore, etichetta) => {
+    const i = el("input");
+    i.type = tipo; i.value = valore;
+    i.setAttribute("aria-label", etichetta);
+    return i;
+  };
+  const titolo = campo("text", a.titolo, "Titolo");
+  const argomento = campo("text", a.argomento, "Argomento");
+  const priorita = campo("range", a.priorita, "Priorità");
+  priorita.min = 1; priorita.max = 5; priorita.step = 1;
+  const numero = el("output", a.priorita);
+  priorita.addEventListener("input", () => {
+    numero.textContent = priorita.value;
+    riga.style.setProperty("--p", priorita.value);
+  });
+  const data = campo("date", a.data, "Data");
+  const minuti = campo("number", a.minuti, "Minuti");
+  minuti.min = 1; minuti.step = 1;
+  const stato = el("select");
+  stato.setAttribute("aria-label", "Stato");
+  for (const [v, t] of [["no", "da fare"], ["si", "completata"]]) {
+    const o = el("option", t);
+    o.value = v;
+    stato.append(o);
+  }
+  stato.value = a.completata ? "si" : "no";
+  const msg = el("span", "", "errore-riga");
+  const salva = el("button", "Salva", "salva");
+  const annulla = el("button", "Annulla", "annulla-modifica");
+  salva.type = annulla.type = "button";
+  annulla.addEventListener("click", () => riga.replaceWith(tr));
+  salva.addEventListener("click", () => {
+    const t = titolo.value.trim(), m = Number(minuti.value);
+    if (!t) { msg.textContent = "Il titolo non può essere vuoto."; return; }
+    if (!data.value) { msg.textContent = "Scegli una data."; return; }
+    if (!Number.isInteger(m) || m <= 0) { msg.textContent = "I minuti devono essere un numero intero maggiore di zero."; return; }
+    Object.assign(a, { titolo: t, argomento: argomento.value.trim() || "generale",
+      priorita: Number(priorita.value), data: data.value, minuti: m, completata: stato.value === "si" });
+    aggiorna();
+  });
+  for (const i of [titolo, argomento, data, minuti])
+    i.addEventListener("keydown", e => {
+      if (e.key === "Enter") salva.click();
+      if (e.key === "Escape") annulla.click();
+    });
+  riga.insertCell().append(titolo);
+  riga.insertCell().append(argomento);
+  riga.insertCell().append(priorita, numero);
+  riga.insertCell().append(data);
+  riga.insertCell().append(minuti);
+  riga.insertCell().append(stato);
+  const az = riga.insertCell();
+  az.className = "azioni";
+  az.append(salva, annulla, msg);
+  tr.replaceWith(riga);
+  titolo.focus();
+}
+
+function trascinaPerEliminare(tr, a) {
+  let x0 = null;
+  const ripristina = () => {
+    x0 = null;
+    tr.classList.remove("trascina");
+    tr.style.transition = "transform .2s, opacity .2s, background .2s";
+    tr.style.transform = tr.style.opacity = tr.style.background = "";
+  };
+  tr.addEventListener("pointerdown", e => {
+    if (e.target.closest("input, button")) return;
+    x0 = e.clientX;
+    tr.setPointerCapture(e.pointerId);
+    tr.classList.add("trascina");
+    tr.style.transition = "none";
+  });
+  tr.addEventListener("pointermove", e => {
+    if (x0 === null) return;
+    const dx = e.clientX - x0, k = Math.min(Math.abs(dx) / SOGLIA, 1);
+    tr.style.transform = "translateX(" + dx + "px)";
+    tr.style.opacity = 1 - k * 0.5;
+    tr.style.background = "rgba(192,57,43," + k * 0.25 + ")";
+  });
+  tr.addEventListener("pointerup", e => {
+    if (x0 === null) return;
+    const dx = e.clientX - x0;
+    if (Math.abs(dx) < SOGLIA) return ripristina();
+    x0 = null;
+    tr.style.transition = "transform .2s, opacity .2s";
+    tr.style.transform = "translateX(" + (dx > 0 ? 100 : -100) + "%)";
+    tr.style.opacity = 0;
+    setTimeout(() => elimina(a), 200);
+  });
+  tr.addEventListener("pointercancel", ripristina);
+}
+
+function elimina(a) {
+  const i = attivita.indexOf(a);
+  if (i < 0) return;
+  attivita.splice(i, 1);
+  ultima = { a, i };
+  aggiorna();
+  $("#toast").hidden = false;
+  clearTimeout(timer);
+  timer = setTimeout(() => { $("#toast").hidden = true; ultima = null; }, 6000);
+}
+function aggiorna() {
+  const tot = attivita.length;
+  const fatte = attivita.filter(a => a.completata);
+  const minuti = lista => lista.reduce((s, a) => s + Number(a.minuti || 0), 0);
+  const ritardo = attivita.filter(a => !a.completata && a.data < OGGI).length;
+  const perc = tot ? Math.round(fatte.length / tot * 1000) / 10 : 0;
+  const per = {};
+  for (const a of attivita) {
+    const v = per[a.argomento] || (per[a.argomento] = { totale: 0, completate: 0, minuti: 0 });
+    v.totale++; v.minuti += Number(a.minuti || 0);
+    if (a.completata) v.completate++;
+  }
+  $("#perc").textContent = perc + "%";
+  $("#anello").style.setProperty("--v", perc);
+  $("#indicatori").replaceChildren(
+    indicatore("totali", tot),
+    indicatore("completate", fatte.length),
+    indicatore("da fare", tot - fatte.length),
+    indicatore("in ritardo", ritardo, "rosso"),
+    indicatore("minuti fatti", minuti(fatte) + "/" + minuti(attivita)));
+  disegnaArgomenti(per);
+  $("#contenuto").hidden = !tot;
+  disegnaTabella();
+}
+async function caricaFile(f) {
+  if (!f) return;
+  try {
+    const testo = (await f.text()).replace(/^\uFEFF/, "");
+    if (!testo.trim()) throw new Error("il file è vuoto.");
+    const report = JSON.parse(testo);
+    verifica(report);
+    attivita = report.attivita;
+    aggiorna();
+    $("#messaggio").textContent = "Caricato: " + f.name;
+    $("#messaggio").className = "";
+  } catch (e) {
+    errore("File non utilizzabile: " + e.message);
+  }
+}
+$("#file").addEventListener("change", () => caricaFile($("#file").files[0]));
+$("#f-priorita").addEventListener("input", () => { $("#f-out").textContent = $("#f-priorita").value; });
+$("#nuova").addEventListener("submit", e => {
+  e.preventDefault();
+  const msg = $("#f-msg");
+  const avviso = testo => { msg.textContent = testo; msg.className = "errore"; };
+  const titolo = $("#f-titolo").value.trim();
+  const data = $("#f-data").value;
+  const minuti = Number($("#f-minuti").value);
+  if (!titolo) return avviso("Il titolo non può essere vuoto.");
+  if (!data) return avviso("Scegli una data.");
+  if (!Number.isInteger(minuti) || minuti <= 0) return avviso("I minuti devono essere un numero intero maggiore di zero.");
+  attivita.push({
+    id: Math.max(0, ...attivita.map(a => Number(a.id) || 0)) + 1,
+    titolo, argomento: $("#f-argomento").value.trim() || "generale",
+    priorita: Number($("#f-priorita").value), data, minuti, completata: false
+  });
+  for (const id of ["#f-titolo", "#f-argomento", "#f-data", "#f-minuti"]) $(id).value = "";
+  $("#f-priorita").value = 3; $("#f-out").textContent = "3";
+  msg.textContent = "Attività aggiunta. Scarica attivita.json per salvarla."; msg.className = "";
+  aggiorna();
+});
+const zona = $("#zona");
+zona.addEventListener("dragover", e => { e.preventDefault(); zona.classList.add("sopra"); });
+zona.addEventListener("dragleave", () => zona.classList.remove("sopra"));
+zona.addEventListener("drop", e => { e.preventDefault(); zona.classList.remove("sopra"); caricaFile(e.dataTransfer.files[0]); });
+$("#filtri").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  stato = b.dataset.f;
+  for (const x of $("#filtri").children) x.setAttribute("aria-pressed", String(x === b));
+  disegnaTabella();
+});
+$("#annulla").addEventListener("click", () => {
+  if (!ultima) return;
+  attivita.splice(ultima.i, 0, ultima.a);
+  ultima = null;
+  $("#toast").hidden = true;
+  aggiorna();
+});
+$("#cerca").addEventListener("input", disegnaTabella);
+$("#ordina").addEventListener("change", disegnaTabella);
+$("#scarica").addEventListener("click", () => {
+  const dati = attivita.map(a => Object.fromEntries(["id", ...CAMPI].map(c => [c, a[c]])));
+  const url = URL.createObjectURL(new Blob([JSON.stringify(dati, null, 2)], { type: "application/json" }));
+  const link = el("a");
+  link.href = url; link.download = "attivita.json";
+  link.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
