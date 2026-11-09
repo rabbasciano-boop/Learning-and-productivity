@@ -1,0 +1,42 @@
+{
+  "attivita_totali": 7,
+  "aperte": 1,
+  "completate": 6,
+  "minuti_residui": 45,
+  "avanzamento_percentuale": 85.7,
+  "attivita_aperte": [
+    {
+      "id": 1,
+      "titolo": "Ripassare le liste",
+      "priorita": "media",
+      "categoria": "Informatica",
+      "impegno_minuti": 45
+    }
+  ],
+  "per_categoria": [
+    {
+      "categoria": "Informatica",
+      "totale": 3,
+      "completate": 2,
+      "minuti_residui": 45
+    },
+    {
+      "categoria": "Economia aziendale",
+      "totale": 2,
+      "completate": 2,
+      "minuti_residui": 0
+    },
+    {
+      "categoria": "Diritto",
+      "totale": 1,
+      "completate": 1,
+      "minuti_residui": 0
+    },
+    {
+      "categoria": "Informatonio",
+      "totale": 1,
+      "completate": 1,
+      "minuti_residui": 0
+    }
+  ]
+}
