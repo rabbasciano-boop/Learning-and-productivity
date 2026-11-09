@@ -5,7 +5,10 @@ tastiera, non stampano e non toccano i file. Così si provano facilmente.
 
 Unità di misura dell'impegno: minuti stimati dall'utente (intero > 0).
 Priorità: "alta", "media" o "bassa".
+Data di inizio: salvata come testo "AAAA-MM-GG" (alle attività senza data viene data quella del giorno in cui si caricano).
 """
+
+from datetime import date
 
 PRIORITA = ("alta", "media", "bassa")   # dalla più urgente alla meno urgente
 PRIORITA_PREDEFINITA = "media"
@@ -52,6 +55,49 @@ def converti_priorita(testo):
     return None
 
 
+def converti_data(testo, predefinita=None):
+    """Converte il testo in una data "AAAA-MM-GG", o None se non valida.
+
+    Accetta "GG/MM/AAAA" (anche con - o . al posto di /) oppure "AAAA-MM-GG".
+    Testo vuoto -> predefinita (ad es. la data di oggi).
+    Esempi: "9/11/2026" -> "2026-11-09"; "2026-11-09" -> "2026-11-09";
+            "31/02/2026", "ieri" -> None
+    """
+    testo = testo.strip()
+    if testo == "":
+        return predefinita
+    try:
+        if len(testo) == 10 and testo[4] == "-" and testo[7] == "-":
+            return date.fromisoformat(testo).isoformat()
+        parti = testo.replace("-", "/").replace(".", "/").split("/")
+        if len(parti) != 3 or not all(p.isdigit() for p in parti) or len(parti[2]) != 4:
+            return None
+        giorno, mese, anno = (int(p) for p in parti)
+        return date(anno, mese, giorno).isoformat()
+    except ValueError:              # ad es. 31 febbraio
+        return None
+
+
+def formatta_data(iso):
+    """Da "AAAA-MM-GG" a "GG/MM/AAAA" per mostrarla all'utente; "—" se manca."""
+    if iso is None:
+        return "—"
+    anno, mese, giorno = iso.split("-")
+    return f"{giorno}/{mese}/{anno}"
+
+
+def data_valida(valore):
+    """True se valore è None oppure una data reale nel formato "AAAA-MM-GG"."""
+    if valore is None:
+        return True
+    if not isinstance(valore, str) or len(valore) != 10:
+        return False
+    try:
+        return date.fromisoformat(valore).isoformat() == valore
+    except ValueError:
+        return False
+
+
 def converti_stato(testo):
     """Converte il testo nello stato dell'attività: True = completata, False = aperta.
 
@@ -76,6 +122,7 @@ def normalizza_record(record):
 
     - "materia" diventa "categoria"
     - se manca "priorita", vale quella predefinita
+    - se "data_inizio" manca o è null, vale la data di oggi
     Modifica il dizionario e lo restituisce; i valori non dict restano come sono.
     """
     if not isinstance(record, dict):
@@ -84,8 +131,10 @@ def normalizza_record(record):
         record["categoria"] = record.pop("materia")
     if "priorita" not in record:
         record["priorita"] = PRIORITA_PREDEFINITA
+    if record.get("data_inizio") is None:
+        record["data_inizio"] = date.today().isoformat()
     # riordina i campi come nelle attività nuove (gli eventuali campi extra restano in fondo)
-    ordine = ["id", "titolo", "priorita", "categoria", "impegno_minuti", "completata"]
+    ordine = ["id", "titolo", "priorita", "categoria", "data_inizio", "impegno_minuti", "completata"]
     vecchio = dict(record)
     record.clear()
     for chiave in ordine:
@@ -103,9 +152,10 @@ def record_valido(record):
     titolo_ok = isinstance(record.get("titolo"), str) and record["titolo"].strip() != ""
     categoria_ok = isinstance(record.get("categoria"), str) and record["categoria"].strip() != ""
     priorita_ok = record.get("priorita") in PRIORITA
+    data_ok = data_valida(record.get("data_inizio"))
     minuti_ok = type(record.get("impegno_minuti")) is int and record["impegno_minuti"] > 0
     stato_ok = isinstance(record.get("completata"), bool)
-    return id_ok and titolo_ok and categoria_ok and priorita_ok and minuti_ok and stato_ok
+    return id_ok and titolo_ok and categoria_ok and priorita_ok and data_ok and minuti_ok and stato_ok
 
 
 # ---------- Operazione 1: aggiungi attività ----------
@@ -119,13 +169,14 @@ def prossimo_id(attivita):
     return massimo + 1
 
 
-def aggiungi_attivita(attivita, titolo, priorita, categoria, minuti):
+def aggiungi_attivita(attivita, titolo, priorita, categoria, data_inizio, minuti):
     """Crea una nuova attività aperta, la aggiunge alla lista e la restituisce."""
     nuova = {
         "id": prossimo_id(attivita),
         "titolo": titolo,
         "priorita": priorita,
         "categoria": categoria,
+        "data_inizio": data_inizio,
         "impegno_minuti": minuti,
         "completata": False,
     }
@@ -162,14 +213,14 @@ def segna_completata(attivita, id_cercato):
 
 # ---------- Operazione 5: modifica attività ----------
 
-CAMPI_MODIFICABILI = ("titolo", "priorita", "categoria", "impegno_minuti", "completata")
+CAMPI_MODIFICABILI = ("titolo", "priorita", "categoria", "data_inizio", "impegno_minuti", "completata")
 
 
 def modifica_attivita(attivita, id_cercato, modifiche):
     """Cambia uno o più campi dell'attività indicata.
 
     modifiche è un dizionario {campo: nuovo valore} con valori GIÀ controllati
-    (ad es. da pulisci_testo, converti_priorita, converti_minuti, converti_stato).
+    (ad es. da pulisci_testo, converti_priorita, converti_data, converti_minuti, converti_stato).
     Si può passare un solo campo oppure tutti quelli di CAMPI_MODIFICABILI.
 
     Restituisce un esito:
@@ -229,6 +280,7 @@ def calcola_riepilogo(attivita):
             "titolo": a["titolo"],
             "priorita": a["priorita"],
             "categoria": a["categoria"],
+            "data_inizio": a["data_inizio"],
             "impegno_minuti": a["impegno_minuti"],
         })
 

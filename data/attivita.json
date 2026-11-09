@@ -4,6 +4,7 @@
     "titolo": "Ripassare le liste",
     "priorita": "media",
     "categoria": "Informatica",
+    "data_inizio": "2026-11-09",
     "impegno_minuti": 45,
     "completata": false
   },
@@ -12,6 +13,7 @@
     "titolo": "Esercizi sui dizionari",
     "priorita": "media",
     "categoria": "Informatica",
+    "data_inizio": "2026-11-09",
     "impegno_minuti": 60,
     "completata": true
   },
@@ -20,6 +22,7 @@
     "titolo": "Leggere capitolo 4",
     "priorita": "media",
     "categoria": "Economia aziendale",
+    "data_inizio": "2026-11-09",
     "impegno_minuti": 30,
     "completata": true
   },
@@ -28,6 +31,7 @@
     "titolo": "Schema bilancio",
     "priorita": "media",
     "categoria": "Economia aziendale",
+    "data_inizio": "2026-11-09",
     "impegno_minuti": 50,
     "completata": true
   },
@@ -36,6 +40,7 @@
     "titolo": "Flashcard diritto",
     "priorita": "media",
     "categoria": "Diritto",
+    "data_inizio": "2026-11-09",
     "impegno_minuti": 20,
     "completata": true
   },
@@ -44,6 +49,7 @@
     "titolo": "Studiare Python",
     "priorita": "media",
     "categoria": "Informatica",
+    "data_inizio": "2026-11-09",
     "impegno_minuti": 120,
     "completata": true
   },
@@ -52,7 +58,17 @@
     "titolo": "Informatica",
     "priorita": "media",
     "categoria": "Informatonio",
+    "data_inizio": "2026-11-09",
     "impegno_minuti": 60,
     "completata": true
+  },
+  {
+    "id": 8,
+    "titolo": "Nuoto",
+    "priorita": "media",
+    "categoria": "Sport",
+    "data_inizio": "2026-11-09",
+    "impegno_minuti": 120,
+    "completata": false
   }
 ]

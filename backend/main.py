@@ -4,6 +4,8 @@ Qui stanno il menu e il dialogo con l'utente nel terminale.
 Le regole sono in logic.py, la lettura/scrittura dei file in storage.py.
 """
 
+from datetime import date
+
 import logic
 import storage
 
@@ -24,11 +26,12 @@ def mostra_attivita(attivita):
     if len(attivita) == 0:
         print("Nessuna attività registrata.")
         return
-    print(f"{'Id':>3}  {'Stato':<11} {'Priorità':<8} {'Minuti':>6}  Titolo (categoria)")
+    print(f"{'Id':>3}  {'Stato':<11} {'Priorità':<8} {'Inizio':<10} {'Minuti':>6}  Titolo (categoria)")
     ordinate = sorted(attivita, key=lambda a: (a["completata"], a["id"]))
     for a in ordinate:
         stato = "completata" if a["completata"] else "aperta"
-        print(f"{a['id']:>3}  {stato:<11} {a['priorita']:<8} {a['impegno_minuti']:>6}  "
+        print(f"{a['id']:>3}  {stato:<11} {a['priorita']:<8} {logic.formatta_data(a['data_inizio']):<10} "
+              f"{a['impegno_minuti']:>6}  "
               f"{a['titolo']} ({a['categoria']})")
 
 
@@ -50,13 +53,21 @@ def operazione_aggiungi(attivita):
         print("Errore: la categoria non può essere vuota. Nessuna attività aggiunta.")
         return
 
+    oggi = date.today().isoformat()
+    data_inizio = logic.converti_data(
+        input(f"Data di inizio (GG/MM/AAAA, invio = oggi {logic.formatta_data(oggi)}): "), oggi)
+    if data_inizio is None:
+        print("Errore: la data deve essere una data reale nel formato GG/MM/AAAA. "
+              "Nessuna attività aggiunta.")
+        return
+
     minuti = logic.converti_minuti(input("Impegno stimato in minuti: "))
     if minuti is None:
         print("Errore: l'impegno deve essere un numero intero di minuti maggiore di 0. "
               "Nessuna attività aggiunta.")
         return
 
-    nuova = logic.aggiungi_attivita(attivita, titolo, priorita, categoria, minuti)
+    nuova = logic.aggiungi_attivita(attivita, titolo, priorita, categoria, data_inizio, minuti)
     storage.salva_attivita(attivita)
     print(f"Attività aggiunta con id {nuova['id']}.")
 
@@ -71,7 +82,7 @@ def operazione_completa(attivita):
     print("Attività aperte:")
     for a in aperte:
         print(f"  {a['id']}. {a['titolo']} ({a['categoria']}, priorità {a['priorita']}, "
-              f"{a['impegno_minuti']} min)")
+              f"inizio {logic.formatta_data(a['data_inizio'])}, {a['impegno_minuti']} min)")
 
     id_scelto = logic.converti_id(input("Id dell'attività completata: "))
     if id_scelto is None:
@@ -94,6 +105,8 @@ CAMPI = {
     "priorita": ("Priorità (alta/media/bassa o 1/2/3)", logic.converti_priorita,
                  "la priorità deve essere alta, media o bassa (oppure 1, 2, 3)."),
     "categoria": ("Categoria", logic.pulisci_testo, "la categoria non può essere vuota."),
+    "data_inizio": ("Data di inizio (GG/MM/AAAA)", logic.converti_data,
+                    "la data deve essere una data reale nel formato GG/MM/AAAA."),
     "impegno_minuti": ("Impegno in minuti", logic.converti_minuti,
                        "l'impegno deve essere un numero intero di minuti maggiore di 0."),
     "completata": ("Stato (aperta/completata)", logic.converti_stato,
@@ -105,6 +118,8 @@ def testo_valore(campo, valore):
     """Come mostrare all'utente il valore attuale di un campo."""
     if campo == "completata":
         return "completata" if valore else "aperta"
+    if campo == "data_inizio":
+        return logic.formatta_data(valore)
     return str(valore)
 
 

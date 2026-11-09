@@ -15,6 +15,7 @@
         <label class="campo">Titolo <input id="f-titolo" type="text" autocomplete="off"></label>
         <label class="campo">Priorità <select id="f-priorita"><option value="alta">Alta</option><option value="media" selected>Media</option><option value="bassa">Bassa</option></select></label>
         <label class="campo">Categoria <input id="f-categoria" type="text" placeholder="es. Informatica" autocomplete="off"></label>
+        <label class="campo">Data di inizio <input id="f-data" type="date"></label>
         <label class="campo">Impegno (minuti) <input id="f-minuti" type="number" min="1" step="1" inputmode="numeric"></label>
         <button class="aggiungi" type="submit">Aggiungi attività</button>
       </div>
@@ -46,6 +47,8 @@
           <option value="file">Ordine del file</option>
           <option value="minuti">Impegno più lungo</option>
           <option value="priorita">Priorità (alta prima)</option>
+          <option value="data">Data di inizio (meno recente prima)</option>
+          <option value="data_desc">Data di inizio (più recente prima)</option>
           <option value="categoria">Categoria (A-Z)</option>
         </select>
         <button class="scarica" id="scarica" type="button">Scarica attivita.json</button>
@@ -53,7 +56,7 @@
       <p class="nota" id="nota-modo"></p>
       <div class="scroll">
         <table>
-          <thead><tr><th>Attività</th><th>Priorità</th><th>Categoria</th><th>Minuti</th><th>Stato</th><th></th></tr></thead>
+          <thead><tr><th>Attività</th><th>Priorità</th><th>Categoria</th><th>Inizio</th><th>Minuti</th><th>Stato</th><th></th></tr></thead>
           <tbody id="righe"></tbody>
         </table>
       </div>
@@ -74,7 +77,7 @@
 
 <script>
 // Schema dei file prodotti da Python (vedi logic.py):
-//  - data/attivita.json    -> lista di { id, titolo, priorita, categoria, impegno_minuti, completata }
+//  - data/attivita.json    -> lista di { id, titolo, priorita, categoria, data_inizio ("AAAA-MM-GG" o null), impegno_minuti, completata }
 //  - output/riepilogo.json -> { attivita_totali, aperte, completate, minuti_residui,
 //                               avanzamento_percentuale, attivita_aperte[], per_categoria[] }
 //  I file del vecchio formato (campo «materia», niente «priorita») vengono convertiti al caricamento.
@@ -106,6 +109,11 @@ const interoPositivo = v => Number.isInteger(v) && v > 0;
 const testoValido = v => typeof v === "string" && v.trim() !== "";
 const PRIORITA = { alta: 3, media: 2, bassa: 1 }; // "priorita" è facoltativa nei file: se manca vale "media"
 const prioritaValida = v => Object.hasOwn(PRIORITA, v);
+// Date: salvate come "AAAA-MM-GG" (come in Python), mostrate come GG/MM/AAAA
+const dataValida = v => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) &&
+  new Date(v + "T00:00:00Z").toISOString().slice(0, 10) === v;
+const mostraData = v => v ? v.split("-").reverse().join("/") : "—";
+const oggi = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const minutiDaTesto = t => /^\d+$/.test(t.trim()) && Number(t) > 0 ? Number(t) : null; // stesse regole di Python
 
 // ---------- Validazione (stesse regole di record_valido in logic.py) ----------
@@ -125,6 +133,7 @@ function controllaAttivita(a, n, conStato) {
   if (!testoValido(a.titolo)) throw new Error(pos + "«titolo» mancante o vuoto.");
   if (!testoValido(a.categoria)) throw new Error(pos + "«categoria» mancante o vuota.");
   if (a.priorita !== undefined && !prioritaValida(a.priorita)) throw new Error(pos + "«priorita» deve essere alta, media o bassa.");
+  if (a.data_inizio != null && !dataValida(a.data_inizio)) throw new Error(pos + "«data_inizio» deve essere una data AAAA-MM-GG oppure null.");
   if (!interoPositivo(a.impegno_minuti)) throw new Error(pos + "«impegno_minuti» deve essere un intero maggiore di 0.");
   if (conStato && typeof a.completata !== "boolean") throw new Error(pos + "«completata» deve essere true o false.");
 }
@@ -207,6 +216,11 @@ function visibili() {
   const o = $("#ordina").value;
   if (o === "minuti") lista.sort((x, y) => y.impegno_minuti - x.impegno_minuti);
   if (o === "priorita") lista.sort((x, y) => (PRIORITA[y.priorita] || 0) - (PRIORITA[x.priorita] || 0));
+  if (o === "data" || o === "data_desc") {   // le attività senza data vanno sempre in fondo
+    const verso = o === "data" ? 1 : -1;
+    lista.sort((x, y) => !x.data_inizio - !y.data_inizio ||
+      verso * (x.data_inizio || "").localeCompare(y.data_inizio || ""));
+  }
   if (o === "categoria") lista.sort((x, y) => x.categoria.localeCompare(y.categoria, "it"));
   return lista;
 }
@@ -225,7 +239,7 @@ function disegnaTabella() {
     const vuota = corpo.insertRow();
     vuota.className = "vuota";
     const td = vuota.insertCell();
-    td.colSpan = 6; td.className = "vuoto";
+    td.colSpan = 7; td.className = "vuoto";
     td.textContent = "Nessuna attività in questo elenco.";
     return;
   }
@@ -237,6 +251,7 @@ function disegnaTabella() {
     tr.insertCell().textContent = a.titolo;
     tr.insertCell().append(a.priorita ? el("span", a.priorita, "tag priorita-" + a.priorita) : el("span", "—"));
     tr.insertCell().textContent = a.categoria;
+    tr.insertCell().textContent = mostraData(a.data_inizio);
     tr.insertCell().textContent = a.impegno_minuti;
     tr.insertCell().append(fatta ? el("span", "completata", "tag fatto") : el("span", "da fare", "tag"));
     const azioni = tr.insertCell();
@@ -253,11 +268,11 @@ function disegnaTabella() {
       bottone("Elimina", "elimina", "Elimina " + a.titolo, () => elimina(a)));
     trascinaPerEliminare(tr, a);
     // doppio clic su una cella: modifica solo quel campo (come la scelta 5 di main.py)
-    const campi = ["titolo", "priorita", "categoria", "impegno_minuti", "completata"];
-    for (const td of [...tr.cells].slice(0, 5)) td.title = "Doppio clic per modificare solo questo campo";
+    const campi = ["titolo", "priorita", "categoria", "data_inizio", "impegno_minuti", "completata"];
+    for (const td of [...tr.cells].slice(0, 6)) td.title = "Doppio clic per modificare solo questo campo";
     tr.addEventListener("dblclick", e => {
       const td = document.elementFromPoint(e.clientX, e.clientY)?.closest("td");
-      if (td && td.parentElement === tr && td.cellIndex < 5) modificaCampo(td, a, campi[td.cellIndex]);
+      if (td && td.parentElement === tr && td.cellIndex < 6) modificaCampo(td, a, campi[td.cellIndex]);
     });
   }
 }
@@ -284,9 +299,9 @@ function modificaCampo(td, a, campo) {
     ctrl.value = campo === "priorita" ? (a.priorita || "media") : (a.completata ? "si" : "no");
   } else {
     ctrl = el("input");
-    ctrl.type = campo === "impegno_minuti" ? "number" : "text";
+    ctrl.type = campo === "impegno_minuti" ? "number" : campo === "data_inizio" ? "date" : "text";
     if (campo === "impegno_minuti") { ctrl.min = 1; ctrl.step = 1; }
-    ctrl.value = a[campo];
+    ctrl.value = a[campo] ?? "";
   }
   ctrl.setAttribute("aria-label", "Nuovo valore");
   const msg = el("span", "", "errore-riga");
@@ -298,6 +313,8 @@ function modificaCampo(td, a, campo) {
     if (campo === "titolo" || campo === "categoria") {
       v = v.trim();
       if (!v) { msg.textContent = campo === "titolo" ? "Il titolo non può essere vuoto." : "La categoria non può essere vuota."; ctrl.focus(); return; }
+    } else if (campo === "data_inizio") {
+      if (!dataValida(v)) { msg.textContent = "Inserisci una data valida."; ctrl.focus(); return; }
     } else if (campo === "impegno_minuti") {
       v = minutiDaTesto(v);
       if (v === null) { msg.textContent = "Serve un intero maggiore di 0."; ctrl.focus(); return; }
@@ -334,6 +351,7 @@ function rigaModifica(tr, a) {
   }
   priorita.value = a.priorita || "media";
   const categoria = campo("text", a.categoria, "Categoria");
+  const dataInizio = campo("date", a.data_inizio ?? "", "Data di inizio");
   const minuti = campo("number", a.impegno_minuti, "Impegno in minuti");
   minuti.min = 1; minuti.step = 1;
   const sel = el("select");
@@ -353,12 +371,13 @@ function rigaModifica(tr, a) {
     const t = titolo.value.trim(), m = categoria.value.trim(), min = minutiDaTesto(minuti.value);
     if (!t) { msg.textContent = "Il titolo non può essere vuoto."; return; }
     if (!m) { msg.textContent = "La categoria non può essere vuota."; return; }
+    if (!dataValida(dataInizio.value)) { msg.textContent = "Inserisci una data di inizio valida."; return; }
     if (min === null) { msg.textContent = "L'impegno deve essere un numero intero di minuti maggiore di 0."; return; }
-    Object.assign(a, { titolo: t, priorita: priorita.value, categoria: m, impegno_minuti: min, completata: sel.value === "si" });
+    Object.assign(a, { titolo: t, priorita: priorita.value, categoria: m, data_inizio: dataInizio.value, impegno_minuti: min, completata: sel.value === "si" });
     segnaModificato(true);
     aggiorna();
   });
-  for (const i of [titolo, categoria, minuti])
+  for (const i of [titolo, categoria, dataInizio, minuti])
     i.addEventListener("keydown", e => {
       if (e.key === "Enter") salva.click();
       if (e.key === "Escape") annulla.click();
@@ -366,6 +385,7 @@ function rigaModifica(tr, a) {
   riga.insertCell().append(titolo);
   riga.insertCell().append(priorita);
   riga.insertCell().append(categoria);
+  riga.insertCell().append(dataInizio);
   riga.insertCell().append(minuti);
   riga.insertCell().append(sel);
   const az = riga.insertCell();
@@ -461,7 +481,7 @@ async function caricaFile(f) {
       verificaArchivio(dati);
       modo = "archivio";
       attivita = dati.map(a => ({ id: a.id, titolo: a.titolo.trim(), priorita: a.priorita || "media", categoria: a.categoria.trim(),
-        impegno_minuti: a.impegno_minuti, completata: a.completata }));
+        data_inizio: a.data_inizio || oggi(), impegno_minuti: a.impegno_minuti, completata: a.completata }));
       riepilogo = null;
       messaggio("Archivio caricato: " + f.name + " (" + attivita.length + " attività, modificabile).");
     } else if (dati && typeof dati === "object" && "attivita_aperte" in dati) { // output/riepilogo.json
@@ -495,13 +515,16 @@ $("#nuova").addEventListener("submit", e => {
   const titolo = $("#f-titolo").value.trim();
   const priorita = $("#f-priorita").value;
   const categoria = $("#f-categoria").value.trim();
+  const dataInizio = $("#f-data").value || oggi();
   const minuti = minutiDaTesto($("#f-minuti").value);
   if (!titolo) return avviso("Il titolo non può essere vuoto.");
   if (!categoria) return avviso("La categoria non può essere vuota.");
+  if (!dataValida(dataInizio)) return avviso("Inserisci una data di inizio valida.");
   if (minuti === null) return avviso("L'impegno deve essere un numero intero di minuti maggiore di 0.");
-  const nuova = { id: prossimoId(), titolo, priorita, categoria, impegno_minuti: minuti, completata: false };
+  const nuova = { id: prossimoId(), titolo, priorita, categoria, data_inizio: dataInizio, impegno_minuti: minuti, completata: false };
   attivita.push(nuova);
   for (const id of ["#f-titolo", "#f-categoria", "#f-minuti"]) $(id).value = "";
+  $("#f-data").value = oggi();
   $("#f-priorita").value = "media";
   msg.textContent = "Aggiunta «" + titolo + "» con id " + nuova.id + ". Scarica attivita.json per salvarla.";
   msg.className = "";
@@ -531,7 +554,7 @@ $("#annulla").addEventListener("click", () => {
 // ---------- Scarica: stesso formato di data/attivita.json ----------
 $("#scarica").addEventListener("click", () => {
   const dati = [...attivita].sort((x, y) => x.id - y.id).map(a => ({
-    id: a.id, titolo: a.titolo, priorita: a.priorita, categoria: a.categoria, impegno_minuti: a.impegno_minuti, completata: a.completata }));
+    id: a.id, titolo: a.titolo, priorita: a.priorita, categoria: a.categoria, data_inizio: a.data_inizio ?? null, impegno_minuti: a.impegno_minuti, completata: a.completata }));
   const url = URL.createObjectURL(new Blob([JSON.stringify(dati, null, 2) + "\n"], { type: "application/json" }));
   const link = el("a");
   link.href = url; link.download = "attivita.json";
@@ -542,6 +565,7 @@ $("#scarica").addEventListener("click", () => {
   segnaModificato(false);
   messaggio("Scaricato attivita.json: mettilo in data/ al posto del vecchio, poi rigenera il riepilogo con python backend/main.py.");
 });
+$("#f-data").value = oggi();
 window.addEventListener("beforeunload", e => { if (modificato) { e.preventDefault(); e.returnValue = ""; } });
 </script>
 </body>

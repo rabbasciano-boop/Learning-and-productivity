@@ -1,16 +1,25 @@
 {
-  "attivita_totali": 7,
-  "aperte": 1,
+  "attivita_totali": 8,
+  "aperte": 2,
   "completate": 6,
-  "minuti_residui": 45,
-  "avanzamento_percentuale": 85.7,
+  "minuti_residui": 165,
+  "avanzamento_percentuale": 75.0,
   "attivita_aperte": [
     {
       "id": 1,
       "titolo": "Ripassare le liste",
       "priorita": "media",
       "categoria": "Informatica",
+      "data_inizio": "2026-11-09",
       "impegno_minuti": 45
+    },
+    {
+      "id": 8,
+      "titolo": "Nuoto",
+      "priorita": "media",
+      "categoria": "Sport",
+      "data_inizio": "2026-11-09",
+      "impegno_minuti": 120
     }
   ],
   "per_categoria": [
@@ -37,6 +46,12 @@
       "totale": 1,
       "completate": 1,
       "minuti_residui": 0
+    },
+    {
+      "categoria": "Sport",
+      "totale": 1,
+      "completate": 0,
+      "minuti_residui": 120
     }
   ]
 }
