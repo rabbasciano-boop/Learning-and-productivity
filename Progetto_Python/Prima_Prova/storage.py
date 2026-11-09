@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from logic import record_valido
+from logic import normalizza_record, record_valido
 
 # Percorsi calcolati rispetto a questo file, così il programma funziona
 # anche se viene avviato da un'altra cartella.
@@ -47,6 +47,7 @@ def carica_attivita(percorso=FILE_ATTIVITA):
 
     id_visti = set()
     for posizione, record in enumerate(dati, start=1):
+        normalizza_record(record)   # accetta anche i file col vecchio campo "materia"
         if not record_valido(record):
             raise ErroreDati(f"L'attività n. {posizione} nel file non è valida.")
         if record["id"] in id_visti:

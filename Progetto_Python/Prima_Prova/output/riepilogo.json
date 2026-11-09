@@ -1,44 +1,39 @@
 {
-  "attivita_totali": 6,
-  "aperte": 3,
-  "completate": 3,
-  "minuti_residui": 135,
-  "avanzamento_percentuale": 50.0,
+  "attivita_totali": 7,
+  "aperte": 1,
+  "completate": 6,
+  "minuti_residui": 45,
+  "avanzamento_percentuale": 85.7,
   "attivita_aperte": [
     {
       "id": 1,
       "titolo": "Ripassare le liste",
-      "materia": "Informatica",
+      "priorita": "media",
+      "categoria": "Informatica",
       "impegno_minuti": 45
-    },
-    {
-      "id": 2,
-      "titolo": "Esercizi sui dizionari",
-      "materia": "Informatica",
-      "impegno_minuti": 60
-    },
-    {
-      "id": 3,
-      "titolo": "Leggere capitolo 4",
-      "materia": "Economia aziendale",
-      "impegno_minuti": 30
     }
   ],
-  "per_materia": [
+  "per_categoria": [
     {
-      "materia": "Informatica",
+      "categoria": "Informatica",
       "totale": 3,
-      "completate": 1,
-      "minuti_residui": 105
+      "completate": 2,
+      "minuti_residui": 45
     },
     {
-      "materia": "Economia aziendale",
+      "categoria": "Economia aziendale",
       "totale": 2,
-      "completate": 1,
-      "minuti_residui": 30
+      "completate": 2,
+      "minuti_residui": 0
     },
     {
-      "materia": "Diritto",
+      "categoria": "Diritto",
+      "totale": 1,
+      "completate": 1,
+      "minuti_residui": 0
+    },
+    {
+      "categoria": "Informatonio",
       "totale": 1,
       "completate": 1,
       "minuti_residui": 0

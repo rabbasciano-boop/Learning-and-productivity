@@ -7,18 +7,14 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="testata"><div>
-  <h1>Le mie attività</h1>
-  <p>Carica il riepilogo creato da <code>python main.py</code> per vedere a che punto sei, oppure carica <code>data/attivita.json</code> per modificare le attività e scaricare il file aggiornato.</p>
-</div></header>
-
 <main>
   <section class="pannello nuova" id="sezione-nuova">
     <h2>Nuova attività</h2>
     <form id="nuova" novalidate>
       <div class="campi">
         <label class="campo">Titolo <input id="f-titolo" type="text" autocomplete="off"></label>
-        <label class="campo">Materia <input id="f-materia" type="text" placeholder="es. Informatica" autocomplete="off"></label>
+        <label class="campo">Priorità <select id="f-priorita"><option value="alta">Alta</option><option value="media" selected>Media</option><option value="bassa">Bassa</option></select></label>
+        <label class="campo">Categoria <input id="f-categoria" type="text" placeholder="es. Informatica" autocomplete="off"></label>
         <label class="campo">Impegno (minuti) <input id="f-minuti" type="number" min="1" step="1" inputmode="numeric"></label>
         <button class="aggiungi" type="submit">Aggiungi attività</button>
       </div>
@@ -33,7 +29,7 @@
     </section>
 
     <section class="pannello argomenti">
-      <h2>Per materia</h2>
+      <h2>Per categoria</h2>
       <div id="materie"></div>
     </section>
 
@@ -45,18 +41,19 @@
           <button type="button" data-f="da_fare" aria-pressed="false">Da fare</button>
           <button type="button" data-f="completate" aria-pressed="false">Completate</button>
         </div>
-        <input type="search" id="cerca" placeholder="Cerca titolo o materia" aria-label="Cerca">
+        <input type="search" id="cerca" placeholder="Cerca titolo o categoria" aria-label="Cerca">
         <select id="ordina" aria-label="Ordina per">
           <option value="file">Ordine del file</option>
           <option value="minuti">Impegno più lungo</option>
-          <option value="materia">Materia (A-Z)</option>
+          <option value="priorita">Priorità (alta prima)</option>
+          <option value="categoria">Categoria (A-Z)</option>
         </select>
         <button class="scarica" id="scarica" type="button">Scarica attivita.json</button>
       </div>
       <p class="nota" id="nota-modo"></p>
       <div class="scroll">
         <table>
-          <thead><tr><th>Attività</th><th>Materia</th><th>Minuti</th><th>Stato</th><th></th></tr></thead>
+          <thead><tr><th>Attività</th><th>Priorità</th><th>Categoria</th><th>Minuti</th><th>Stato</th><th></th></tr></thead>
           <tbody id="righe"></tbody>
         </table>
       </div>
@@ -77,9 +74,10 @@
 
 <script>
 // Schema dei file prodotti da Python (vedi logic.py):
-//  - data/attivita.json    -> lista di { id, titolo, materia, impegno_minuti, completata }
+//  - data/attivita.json    -> lista di { id, titolo, priorita, categoria, impegno_minuti, completata }
 //  - output/riepilogo.json -> { attivita_totali, aperte, completate, minuti_residui,
-//                               avanzamento_percentuale, attivita_aperte[], per_materia[] }
+//                               avanzamento_percentuale, attivita_aperte[], per_categoria[] }
+//  I file del vecchio formato (campo «materia», niente «priorita») vengono convertiti al caricamento.
 const $ = s => document.querySelector(s);
 const SOGLIA = 120; // pixel di trascinamento oltre i quali si elimina
 
@@ -106,15 +104,27 @@ function segnaModificato(v) {
 }
 const interoPositivo = v => Number.isInteger(v) && v > 0;
 const testoValido = v => typeof v === "string" && v.trim() !== "";
+const PRIORITA = { alta: 3, media: 2, bassa: 1 }; // "priorita" è facoltativa nei file: se manca vale "media"
+const prioritaValida = v => Object.hasOwn(PRIORITA, v);
 const minutiDaTesto = t => /^\d+$/.test(t.trim()) && Number(t) > 0 ? Number(t) : null; // stesse regole di Python
 
 // ---------- Validazione (stesse regole di record_valido in logic.py) ----------
+// Vecchio formato -> nuovo: «materia» diventa «categoria» (come normalizza_record in logic.py)
+function aggiornaFormato(a) {
+  if (a && typeof a === "object" && !("categoria" in a) && "materia" in a) {
+    a.categoria = a.materia;
+    delete a.materia;
+  }
+  return a;
+}
 function controllaAttivita(a, n, conStato) {
+  aggiornaFormato(a);
   const pos = "attività n. " + n + ": ";
   if (typeof a !== "object" || a === null || Array.isArray(a)) throw new Error(pos + "non è un oggetto.");
   if (!interoPositivo(a.id)) throw new Error(pos + "«id» deve essere un intero maggiore di 0.");
   if (!testoValido(a.titolo)) throw new Error(pos + "«titolo» mancante o vuoto.");
-  if (!testoValido(a.materia)) throw new Error(pos + "«materia» mancante o vuota.");
+  if (!testoValido(a.categoria)) throw new Error(pos + "«categoria» mancante o vuota.");
+  if (a.priorita !== undefined && !prioritaValida(a.priorita)) throw new Error(pos + "«priorita» deve essere alta, media o bassa.");
   if (!interoPositivo(a.impegno_minuti)) throw new Error(pos + "«impegno_minuti» deve essere un intero maggiore di 0.");
   if (conStato && typeof a.completata !== "boolean") throw new Error(pos + "«completata» deve essere true o false.");
 }
@@ -136,11 +146,16 @@ function verificaRiepilogo(r) {
   if (!Array.isArray(r.attivita_aperte)) throw new Error("manca la lista «attivita_aperte».");
   r.attivita_aperte.forEach((a, i) => controllaAttivita(a, i + 1, false));
   controllaIdUnici(r.attivita_aperte);
-  if (r.per_materia !== undefined) {
-    if (!Array.isArray(r.per_materia)) throw new Error("«per_materia» deve essere una lista.");
-    for (const v of r.per_materia)
-      if (!testoValido(v.materia) || ![v.totale, v.completate, v.minuti_residui].every(x => Number.isInteger(x) && x >= 0))
-        throw new Error("una voce di «per_materia» non è valida.");
+  if (r.per_categoria === undefined && r.per_materia !== undefined) { // vecchio riepilogo
+    r.per_categoria = r.per_materia;
+    delete r.per_materia;
+    if (Array.isArray(r.per_categoria)) r.per_categoria.forEach(aggiornaFormato);
+  }
+  if (r.per_categoria !== undefined) {
+    if (!Array.isArray(r.per_categoria)) throw new Error("«per_categoria» deve essere una lista.");
+    for (const v of r.per_categoria)
+      if (!testoValido(v.categoria) || ![v.totale, v.completate, v.minuti_residui].every(x => Number.isInteger(x) && x >= 0))
+        throw new Error("una voce di «per_categoria» non è valida.");
   }
 }
 
@@ -156,7 +171,7 @@ function anteprima() {
   const tot = attivita.length, fatte = tot - aperte.length;
   const per = {};
   for (const a of attivita) {
-    const v = per[a.materia] || (per[a.materia] = { materia: a.materia, totale: 0, completate: 0, minuti_residui: 0 });
+    const v = per[a.categoria] || (per[a.categoria] = { categoria: a.categoria, totale: 0, completate: 0, minuti_residui: 0 });
     v.totale++;
     if (a.completata) v.completate++; else v.minuti_residui += a.impegno_minuti;
   }
@@ -164,20 +179,20 @@ function anteprima() {
     attivita_totali: tot, aperte: aperte.length, completate: fatte,
     minuti_residui: aperte.reduce((s, a) => s + a.impegno_minuti, 0),
     avanzamento_percentuale: tot ? Math.round(fatte / tot * 1000) / 10 : 0,
-    per_materia: Object.values(per)
+    per_categoria: Object.values(per)
   };
 }
-function disegnaMaterie(voci) {
+function disegnaCategorie(voci) {
   const box = $("#materie");
   box.replaceChildren();
-  if (voci === undefined) { box.append(el("p", "Questo riepilogo non contiene il dettaglio per materia: rigeneralo da python main.py.", "vuoto")); return; }
-  if (!voci.length) { box.append(el("p", "Nessuna materia.", "vuoto")); return; }
+  if (voci === undefined) { box.append(el("p", "Questo riepilogo non contiene il dettaglio per categoria: rigeneralo da python main.py.", "vuoto")); return; }
+  if (!voci.length) { box.append(el("p", "Nessuna categoria.", "vuoto")); return; }
   for (const v of voci) {
     const riga = el("div", undefined, "argomento");
     const traccia = el("div", undefined, "traccia"), riempi = el("i");
     riempi.style.width = (v.totale ? v.completate / v.totale * 100 : 0) + "%";
     traccia.append(riempi);
-    riga.append(el("span", v.materia, "nome"), traccia,
+    riga.append(el("span", v.categoria, "nome"), traccia,
       el("span", v.completate + "/" + v.totale + " · " + v.minuti_residui + " min residui", "dettaglio"));
     box.append(riga);
   }
@@ -188,10 +203,11 @@ function visibili() {
   const q = $("#cerca").value.trim().toLowerCase();
   const lista = attivita.filter(a =>
     (modo === "riepilogo" || stato === "tutte" || (stato === "completate") === a.completata) &&
-    (!q || (a.titolo + " " + a.materia).toLowerCase().includes(q)));
+    (!q || (a.titolo + " " + a.categoria).toLowerCase().includes(q)));
   const o = $("#ordina").value;
   if (o === "minuti") lista.sort((x, y) => y.impegno_minuti - x.impegno_minuti);
-  if (o === "materia") lista.sort((x, y) => x.materia.localeCompare(y.materia, "it"));
+  if (o === "priorita") lista.sort((x, y) => (PRIORITA[y.priorita] || 0) - (PRIORITA[x.priorita] || 0));
+  if (o === "categoria") lista.sort((x, y) => x.categoria.localeCompare(y.categoria, "it"));
   return lista;
 }
 function bottone(testo, classe, etichetta, azione) {
@@ -209,7 +225,7 @@ function disegnaTabella() {
     const vuota = corpo.insertRow();
     vuota.className = "vuota";
     const td = vuota.insertCell();
-    td.colSpan = 5; td.className = "vuoto";
+    td.colSpan = 6; td.className = "vuoto";
     td.textContent = "Nessuna attività in questo elenco.";
     return;
   }
@@ -219,7 +235,8 @@ function disegnaTabella() {
     tr.className = fatta ? "fatta" : "";
     tr.style.setProperty("--p", fatta ? 1 : 3); // bordo verde se completata, giallo se da fare
     tr.insertCell().textContent = a.titolo;
-    tr.insertCell().textContent = a.materia;
+    tr.insertCell().append(a.priorita ? el("span", a.priorita, "tag priorita-" + a.priorita) : el("span", "—"));
+    tr.insertCell().textContent = a.categoria;
     tr.insertCell().textContent = a.impegno_minuti;
     tr.insertCell().append(fatta ? el("span", "completata", "tag fatto") : el("span", "da fare", "tag"));
     const azioni = tr.insertCell();
@@ -235,6 +252,13 @@ function disegnaTabella() {
       bottone("Modifica", "modifica", "Modifica " + a.titolo, () => rigaModifica(tr, a)),
       bottone("Elimina", "elimina", "Elimina " + a.titolo, () => elimina(a)));
     trascinaPerEliminare(tr, a);
+    // doppio clic su una cella: modifica solo quel campo (come la scelta 5 di main.py)
+    const campi = ["titolo", "priorita", "categoria", "impegno_minuti", "completata"];
+    for (const td of [...tr.cells].slice(0, 5)) td.title = "Doppio clic per modificare solo questo campo";
+    tr.addEventListener("dblclick", e => {
+      const td = document.elementFromPoint(e.clientX, e.clientY)?.closest("td");
+      if (td && td.parentElement === tr && td.cellIndex < 5) modificaCampo(td, a, campi[td.cellIndex]);
+    });
   }
 }
 
@@ -247,6 +271,51 @@ function cambiaStato(a) {
   segnaModificato(true);
   aggiorna();
 }
+// Modifica di un solo campo dentro la sua cella: Invio o clic fuori salva, Esc annulla
+function modificaCampo(td, a, campo) {
+  if (td.querySelector("input, select")) return;
+  let ctrl;
+  if (campo === "priorita" || campo === "completata") {
+    ctrl = el("select");
+    const voci = campo === "priorita"
+      ? [["alta", "alta"], ["media", "media"], ["bassa", "bassa"]]
+      : [["no", "da fare"], ["si", "completata"]];
+    for (const [v, t] of voci) { const o = el("option", t); o.value = v; ctrl.append(o); }
+    ctrl.value = campo === "priorita" ? (a.priorita || "media") : (a.completata ? "si" : "no");
+  } else {
+    ctrl = el("input");
+    ctrl.type = campo === "impegno_minuti" ? "number" : "text";
+    if (campo === "impegno_minuti") { ctrl.min = 1; ctrl.step = 1; }
+    ctrl.value = a[campo];
+  }
+  ctrl.setAttribute("aria-label", "Nuovo valore");
+  const msg = el("span", "", "errore-riga");
+  let chiuso = false;
+  const chiudi = () => { chiuso = true; aggiorna(); };
+  const salva = () => {
+    if (chiuso) return;
+    let v = ctrl.value;
+    if (campo === "titolo" || campo === "categoria") {
+      v = v.trim();
+      if (!v) { msg.textContent = campo === "titolo" ? "Il titolo non può essere vuoto." : "La categoria non può essere vuota."; ctrl.focus(); return; }
+    } else if (campo === "impegno_minuti") {
+      v = minutiDaTesto(v);
+      if (v === null) { msg.textContent = "Serve un intero maggiore di 0."; ctrl.focus(); return; }
+    } else if (campo === "completata") {
+      v = v === "si";
+    }
+    if (a[campo] !== v) { a[campo] = v; segnaModificato(true); }
+    chiudi();
+  };
+  ctrl.addEventListener("keydown", e => {
+    if (e.key === "Enter") salva();
+    if (e.key === "Escape") chiudi();
+  });
+  ctrl.addEventListener("blur", () => setTimeout(salva, 0));
+  if (ctrl.tagName === "SELECT") ctrl.addEventListener("change", salva);
+  td.replaceChildren(ctrl, msg);
+  ctrl.focus();
+}
 function rigaModifica(tr, a) {
   const riga = el("tr", undefined, "inModifica");
   const campo = (tipo, valore, etichetta) => {
@@ -256,7 +325,15 @@ function rigaModifica(tr, a) {
     return i;
   };
   const titolo = campo("text", a.titolo, "Titolo");
-  const materia = campo("text", a.materia, "Materia");
+  const priorita = el("select");
+  priorita.setAttribute("aria-label", "Priorità");
+  for (const v of ["alta", "media", "bassa"]) {
+    const o = el("option", v);
+    o.value = v;
+    priorita.append(o);
+  }
+  priorita.value = a.priorita || "media";
+  const categoria = campo("text", a.categoria, "Categoria");
   const minuti = campo("number", a.impegno_minuti, "Impegno in minuti");
   minuti.min = 1; minuti.step = 1;
   const sel = el("select");
@@ -273,21 +350,22 @@ function rigaModifica(tr, a) {
   salva.type = annulla.type = "button";
   annulla.addEventListener("click", () => riga.replaceWith(tr));
   salva.addEventListener("click", () => {
-    const t = titolo.value.trim(), m = materia.value.trim(), min = minutiDaTesto(minuti.value);
+    const t = titolo.value.trim(), m = categoria.value.trim(), min = minutiDaTesto(minuti.value);
     if (!t) { msg.textContent = "Il titolo non può essere vuoto."; return; }
-    if (!m) { msg.textContent = "La materia non può essere vuota."; return; }
+    if (!m) { msg.textContent = "La categoria non può essere vuota."; return; }
     if (min === null) { msg.textContent = "L'impegno deve essere un numero intero di minuti maggiore di 0."; return; }
-    Object.assign(a, { titolo: t, materia: m, impegno_minuti: min, completata: sel.value === "si" });
+    Object.assign(a, { titolo: t, priorita: priorita.value, categoria: m, impegno_minuti: min, completata: sel.value === "si" });
     segnaModificato(true);
     aggiorna();
   });
-  for (const i of [titolo, materia, minuti])
+  for (const i of [titolo, categoria, minuti])
     i.addEventListener("keydown", e => {
       if (e.key === "Enter") salva.click();
       if (e.key === "Escape") annulla.click();
     });
   riga.insertCell().append(titolo);
-  riga.insertCell().append(materia);
+  riga.insertCell().append(priorita);
+  riga.insertCell().append(categoria);
   riga.insertCell().append(minuti);
   riga.insertCell().append(sel);
   const az = riga.insertCell();
@@ -352,7 +430,7 @@ function aggiorna() {
   $("#scarica").style.display = archivio ? "" : "none";
   $("#titolo-elenco").textContent = archivio ? "Attività" : "Attività da fare";
   $("#nota-modo").textContent = archivio
-    ? "Usa «Completa», «Modifica» o trascina una riga di lato per eliminarla. Gli indicatori sono un'anteprima: quando hai finito scarica il file, mettilo in data/ al posto di attivita.json e rigenera il riepilogo con python main.py."
+    ? "Usa «Completa», «Modifica» (tutta l'attività), fai doppio clic su una cella per cambiare solo quel campo, o trascina una riga di lato per eliminarla. Gli indicatori sono un'anteprima: quando hai finito scarica il file, mettilo in data/ al posto di attivita.json e rigenera il riepilogo con python main.py."
     : "Riepilogo calcolato da Python, in sola lettura. Per cambiare lo stato di un'attività usa python main.py (oppure carica data/attivita.json) e rigenera il riepilogo.";
 
   $("#perc").textContent = r.avanzamento_percentuale + "%";
@@ -362,7 +440,7 @@ function aggiorna() {
     indicatore("completate", r.completate),
     indicatore("da fare", r.aperte),
     indicatore("minuti residui", r.minuti_residui));
-  disegnaMaterie(r.per_materia);
+  disegnaCategorie(r.per_categoria);
 
   $("#contenuto").hidden = archivio && !attivita.length && !fileCaricato;
   disegnaTabella();
@@ -382,7 +460,7 @@ async function caricaFile(f) {
     if (Array.isArray(dati)) {                                   // data/attivita.json
       verificaArchivio(dati);
       modo = "archivio";
-      attivita = dati.map(a => ({ id: a.id, titolo: a.titolo.trim(), materia: a.materia.trim(),
+      attivita = dati.map(a => ({ id: a.id, titolo: a.titolo.trim(), priorita: a.priorita || "media", categoria: a.categoria.trim(),
         impegno_minuti: a.impegno_minuti, completata: a.completata }));
       riepilogo = null;
       messaggio("Archivio caricato: " + f.name + " (" + attivita.length + " attività, modificabile).");
@@ -415,14 +493,16 @@ $("#nuova").addEventListener("submit", e => {
   const msg = $("#f-msg");
   const avviso = testo => { msg.textContent = testo; msg.className = "errore"; };
   const titolo = $("#f-titolo").value.trim();
-  const materia = $("#f-materia").value.trim();
+  const priorita = $("#f-priorita").value;
+  const categoria = $("#f-categoria").value.trim();
   const minuti = minutiDaTesto($("#f-minuti").value);
   if (!titolo) return avviso("Il titolo non può essere vuoto.");
-  if (!materia) return avviso("La materia non può essere vuota.");
+  if (!categoria) return avviso("La categoria non può essere vuota.");
   if (minuti === null) return avviso("L'impegno deve essere un numero intero di minuti maggiore di 0.");
-  const nuova = { id: prossimoId(), titolo, materia, impegno_minuti: minuti, completata: false };
+  const nuova = { id: prossimoId(), titolo, priorita, categoria, impegno_minuti: minuti, completata: false };
   attivita.push(nuova);
-  for (const id of ["#f-titolo", "#f-materia", "#f-minuti"]) $(id).value = "";
+  for (const id of ["#f-titolo", "#f-categoria", "#f-minuti"]) $(id).value = "";
+  $("#f-priorita").value = "media";
   msg.textContent = "Aggiunta «" + titolo + "» con id " + nuova.id + ". Scarica attivita.json per salvarla.";
   msg.className = "";
   segnaModificato(true);
@@ -451,7 +531,7 @@ $("#annulla").addEventListener("click", () => {
 // ---------- Scarica: stesso formato di data/attivita.json ----------
 $("#scarica").addEventListener("click", () => {
   const dati = [...attivita].sort((x, y) => x.id - y.id).map(a => ({
-    id: a.id, titolo: a.titolo, materia: a.materia, impegno_minuti: a.impegno_minuti, completata: a.completata }));
+    id: a.id, titolo: a.titolo, priorita: a.priorita, categoria: a.categoria, impegno_minuti: a.impegno_minuti, completata: a.completata }));
   const url = URL.createObjectURL(new Blob([JSON.stringify(dati, null, 2) + "\n"], { type: "application/json" }));
   const link = el("a");
   link.href = url; link.download = "attivita.json";

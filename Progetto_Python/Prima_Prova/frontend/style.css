@@ -17,7 +17,7 @@ code { background: rgba(201,168,106,.25); padding: .1em .35em; border-radius: 3p
 .testata > div, main { max-width: 62rem; margin: 0 auto; }
 .testata h1 { font-size: clamp(1.9rem, 5vw, 2.75rem); }
 .testata p { margin: .5rem 0 0; color: #c3ccdb; max-width: 52ch; }
-main { padding: 0 1rem 3rem; margin-top: -2rem; }
+main { padding: 2rem 1rem 3rem; }
 
 .pannello { background: var(--pannello); border: 1px solid var(--linea); border-radius: 10px; box-shadow: var(--ombra); padding: 1.25rem; margin-bottom: 1.25rem; }
 .carica { display: block; text-align: center; border: 2px dashed var(--linea); border-radius: 8px; padding: 1.5rem 1rem; cursor: pointer; transition: border-color .15s, background .15s; }
@@ -68,6 +68,9 @@ td output { display: inline-block; width: 1.5rem; margin-left: .5rem; font: 400 
 .tag { display: inline-block; border-radius: 999px; padding: .1rem .65rem; font-size: .8rem; font-weight: 600; border: 1px solid var(--linea); }
 .tag.fatto { color: var(--ok); border-color: var(--ok); }
 .tag.ritardo { color: var(--rosso); border-color: var(--rosso); }
+.tag.priorita-alta { color: var(--rosso); border-color: var(--rosso); }
+.tag.priorita-media { color: var(--oro); border-color: var(--oro); }
+.tag.priorita-bassa { color: var(--tenue); }
 tr.fatta td:first-child { color: var(--tenue); text-decoration: line-through; font-weight: 400; }
 .vuoto { text-align: center; color: var(--tenue); padding: 1.5rem; }
 

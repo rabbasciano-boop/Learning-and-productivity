@@ -2,43 +2,57 @@
   {
     "id": 1,
     "titolo": "Ripassare le liste",
-    "materia": "Informatica",
+    "priorita": "media",
+    "categoria": "Informatica",
     "impegno_minuti": 45,
     "completata": false
   },
   {
     "id": 2,
     "titolo": "Esercizi sui dizionari",
-    "materia": "Informatica",
+    "priorita": "media",
+    "categoria": "Informatica",
     "impegno_minuti": 60,
-    "completata": false
+    "completata": true
   },
   {
     "id": 3,
     "titolo": "Leggere capitolo 4",
-    "materia": "Economia aziendale",
+    "priorita": "media",
+    "categoria": "Economia aziendale",
     "impegno_minuti": 30,
-    "completata": false
+    "completata": true
   },
   {
     "id": 4,
     "titolo": "Schema bilancio",
-    "materia": "Economia aziendale",
+    "priorita": "media",
+    "categoria": "Economia aziendale",
     "impegno_minuti": 50,
     "completata": true
   },
   {
     "id": 5,
     "titolo": "Flashcard diritto",
-    "materia": "Diritto",
+    "priorita": "media",
+    "categoria": "Diritto",
     "impegno_minuti": 20,
     "completata": true
   },
   {
     "id": 6,
     "titolo": "Studiare Python",
-    "materia": "Informatica",
+    "priorita": "media",
+    "categoria": "Informatica",
     "impegno_minuti": 120,
+    "completata": true
+  },
+  {
+    "id": 7,
+    "titolo": "Informatica",
+    "priorita": "media",
+    "categoria": "Informatonio",
+    "impegno_minuti": 60,
     "completata": true
   }
 ]
