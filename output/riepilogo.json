@@ -1,9 +1,9 @@
 {
-  "attivita_totali": 8,
-  "aperte": 5,
+  "attivita_totali": 9,
+  "aperte": 6,
   "completate": 3,
-  "minuti_residui": 255,
-  "avanzamento_percentuale": 37.5,
+  "minuti_residui": 260,
+  "avanzamento_percentuale": 33.3,
   "attivita_aperte": [
     {
       "id": 1,
@@ -36,6 +36,13 @@
       "materia": "salute",
       "impegno_minuti": 60,
       "scadenza": "2026-11-20"
+    },
+    {
+      "id": 9,
+      "titolo": "fadef",
+      "materia": "gfs<g",
+      "impegno_minuti": 5,
+      "scadenza": "2026-11-18"
     }
   ],
   "per_materia": [
@@ -68,6 +75,12 @@
       "totale": 1,
       "completate": 0,
       "minuti_residui": 60
+    },
+    {
+      "materia": "gfs<g",
+      "totale": 1,
+      "completate": 0,
+      "minuti_residui": 5
     }
   ]
 }
