@@ -40,5 +40,21 @@
     "materia": "Informatica",
     "impegno_minuti": 120,
     "completata": true
+  },
+  {
+    "id": 7,
+    "titolo": "ripasso di storia dell'arte",
+    "materia": "storia dell'arte",
+    "impegno_minuti": 60,
+    "scadenza": "2026-11-10",
+    "completata": false
+  },
+  {
+    "id": 8,
+    "titolo": "Andare al dentista",
+    "materia": "salute",
+    "impegno_minuti": 60,
+    "completata": false,
+    "scadenza": "2026-11-20"
   }
 ]

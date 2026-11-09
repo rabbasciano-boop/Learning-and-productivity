@@ -18,10 +18,11 @@ try { const t = localStorage.getItem("tema"); if (t === "chiaro" || t === "scuro
 <main>
   <section class="pannello nuova" id="sezione-nuova">
     <h2>Nuova attività</h2>
+    <p>Le attività vengono salvate in data/attivita.json e in output/riepilogo.json.</p>
     <form id="nuova" novalidate>
       <div class="campi">
         <label class="campo">Titolo <input id="f-titolo" type="text" autocomplete="off"></label>
-        <label class="campo">Materia <input id="f-materia" type="text" placeholder="es. Informatica" autocomplete="off"></label>
+        <label class="campo">Categoria <input id="f-materia" type="text" placeholder="es. Informatica, Casa, Salute" autocomplete="off"></label>
         <label class="campo">Impegno (minuti) <input id="f-minuti" type="number" min="1" step="1" inputmode="numeric"></label>
         <label class="campo">Scadenza (facoltativa) <input id="f-scadenza" type="date"></label>
         <button class="aggiungi" type="submit">Aggiungi attività</button>
@@ -37,7 +38,7 @@ try { const t = localStorage.getItem("tema"); if (t === "chiaro" || t === "scuro
     </section>
 
     <section class="pannello argomenti">
-      <h2>Per materia</h2>
+      <h2>Per categoria</h2>
       <div id="materie"></div>
     </section>
 
@@ -49,17 +50,17 @@ try { const t = localStorage.getItem("tema"); if (t === "chiaro" || t === "scuro
           <button type="button" data-f="da_fare" aria-pressed="false">Da fare</button>
           <button type="button" data-f="completate" aria-pressed="false">Completate</button>
         </div>
-        <input type="search" id="cerca" placeholder="Cerca titolo o materia" aria-label="Cerca">
+        <input type="search" id="cerca" placeholder="Cerca titolo o categoria" aria-label="Cerca">
         <select id="ordina" aria-label="Ordina per">
           <option value="file">Ordine del file</option>
           <option value="minuti">Impegno più lungo</option>
-          <option value="materia">Materia (A-Z)</option>
+          <option value="materia">Categoria (A-Z)</option>
         </select>
         <button class="scarica" id="scarica" type="button">Scarica attivita.json</button>
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Attività</th><th>Materia</th><th>Minuti</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
+          <thead><tr><th>Attività</th><th>Categoria</th><th>Minuti</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
           <tbody id="righe"></tbody>
         </table>
       </div>
@@ -126,7 +127,7 @@ function controllaAttivita(a, n, conStato) {
   if (typeof a !== "object" || a === null || Array.isArray(a)) throw new Error(pos + "non è un oggetto.");
   if (!interoPositivo(a.id)) throw new Error(pos + "«id» deve essere un intero maggiore di 0.");
   if (!testoValido(a.titolo)) throw new Error(pos + "«titolo» mancante o vuoto.");
-  if (!testoValido(a.materia)) throw new Error(pos + "«materia» mancante o vuota.");
+  if (!testoValido(a.materia)) throw new Error(pos + "categoria mancante o vuota.");
   if (!interoPositivo(a.impegno_minuti)) throw new Error(pos + "«impegno_minuti» deve essere un intero maggiore di 0.");
   if (a.scadenza !== undefined && a.scadenza !== null && a.scadenza !== "" && !(typeof a.scadenza === "string" && dataValida(a.scadenza)))
     throw new Error(pos + "«scadenza» deve essere una data nel formato AAAA-MM-GG.");
@@ -151,10 +152,10 @@ function verificaRiepilogo(r) {
   r.attivita_aperte.forEach((a, i) => controllaAttivita(a, i + 1, false));
   controllaIdUnici(r.attivita_aperte);
   if (r.per_materia !== undefined) {
-    if (!Array.isArray(r.per_materia)) throw new Error("«per_materia» deve essere una lista.");
+    if (!Array.isArray(r.per_materia)) throw new Error("il dettaglio per categoria deve essere una lista.");
     for (const v of r.per_materia)
       if (!testoValido(v.materia) || ![v.totale, v.completate, v.minuti_residui].every(x => Number.isInteger(x) && x >= 0))
-        throw new Error("una voce di «per_materia» non è valida.");
+        throw new Error("una voce del dettaglio per categoria non è valida.");
   }
 }
 
@@ -184,8 +185,8 @@ function anteprima() {
 function disegnaMaterie(voci) {
   const box = $("#materie");
   box.replaceChildren();
-  if (voci === undefined) { box.append(el("p", "Questo riepilogo non contiene il dettaglio per materia: rigeneralo da python main.py.", "vuoto")); return; }
-  if (!voci.length) { box.append(el("p", "Nessuna materia.", "vuoto")); return; }
+  if (voci === undefined) { box.append(el("p", "Questo riepilogo non contiene il dettaglio per categoria: rigeneralo da python main.py.", "vuoto")); return; }
+  if (!voci.length) { box.append(el("p", "Nessuna categoria.", "vuoto")); return; }
   for (const v of voci) {
     const riga = el("div", undefined, "argomento");
     const traccia = el("div", undefined, "traccia"), riempi = el("i");
@@ -273,7 +274,7 @@ function rigaModifica(tr, a) {
     return i;
   };
   const titolo = campo("text", a.titolo, "Titolo");
-  const materia = campo("text", a.materia, "Materia");
+  const materia = campo("text", a.materia, "Categoria");
   const minuti = campo("number", a.impegno_minuti, "Impegno in minuti");
   minuti.min = 1; minuti.step = 1;
   const scadenza = campo("date", a.scadenza || "", "Scadenza");
@@ -293,7 +294,7 @@ function rigaModifica(tr, a) {
   salva.addEventListener("click", () => {
     const t = titolo.value.trim(), m = materia.value.trim(), min = minutiDaTesto(minuti.value);
     if (!t) { msg.textContent = "Il titolo non può essere vuoto."; return; }
-    if (!m) { msg.textContent = "La materia non può essere vuota."; return; }
+    if (!m) { msg.textContent = "Inserisci una categoria."; return; }
     if (min === null) { msg.textContent = "L'impegno deve essere un numero intero di minuti maggiore di 0."; return; }
     Object.assign(a, { titolo: t, materia: m, impegno_minuti: min, completata: sel.value === "si", scadenza: scadenza.value });
     segnaModificato(true);
@@ -366,7 +367,7 @@ function aggiorna() {
   const archivio = modo === "archivio";
   const r = archivio ? anteprima() : riepilogo;
 
-  $("#sezione-nuova").hidden = !archivio;
+  $("#sezione-nuova").hidden = false;
   $("#filtri").style.display = archivio ? "" : "none";
   $("#scarica").style.display = archivio ? "" : "none";
   $("#titolo-elenco").textContent = archivio ? "Attività" : "Attività da fare";
@@ -426,7 +427,8 @@ zona.addEventListener("dragleave", () => zona.classList.remove("sopra"));
 zona.addEventListener("drop", e => { e.preventDefault(); zona.classList.remove("sopra"); caricaFile(e.dataTransfer.files[0]); });
 
 // ---------- Nuova attività (stesse regole dell'operazione 1 in Python) ----------
-$("#nuova").addEventListener("submit", e => {
+
+$("#nuova").addEventListener("submit", async e => {
   e.preventDefault();
   const msg = $("#f-msg");
   const avviso = testo => { msg.textContent = testo; msg.className = "errore"; };
@@ -435,15 +437,38 @@ $("#nuova").addEventListener("submit", e => {
   const minuti = minutiDaTesto($("#f-minuti").value);
   const scadenza = $("#f-scadenza").value;
   if (!titolo) return avviso("Il titolo non può essere vuoto.");
-  if (!materia) return avviso("La materia non può essere vuota.");
+  if (!materia) return avviso("Inserisci una categoria.");
   if (minuti === null) return avviso("L'impegno deve essere un numero intero di minuti maggiore di 0.");
-  const nuova = { id: prossimoId(), titolo, materia, impegno_minuti: minuti, completata: false, scadenza };
-  attivita.push(nuova);
-  for (const id of ["#f-titolo", "#f-materia", "#f-minuti", "#f-scadenza"]) $(id).value = "";
-  msg.textContent = "Aggiunta «" + titolo + "» (id " + nuova.id + ").";
-  msg.className = "";
-  segnaModificato(true);
-  aggiorna();
+  if (location.protocol === "file:") return avviso("Avvia backend/server.py con Python e usa la pagina che si apre nel browser.");
+  if (modificato) return avviso("Scarica prima le modifiche pendenti all’archivio.");
+  const pulsante = e.currentTarget.querySelector("button[type=submit]");
+  if (pulsante.disabled) return;
+  pulsante.disabled = true;
+  try {
+    const risposta = await fetch("/api/riepilogo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titolo, materia, impegno_minuti: minuti, scadenza })
+    });
+    const r = await risposta.json();
+    if (!risposta.ok) throw new Error(r.errore);
+    modo = "riepilogo";
+    riepilogo = r;
+    attivita = r.attivita_aperte;
+    ultima = null;
+    $("#toast").hidden = true;
+    fileCaricato = true;
+    $("#nuova").reset();
+    aggiorna();
+    messaggio("Riepilogo caricato: riepilogo.json.");
+    msg.textContent = "Salvata «" + titolo + "» in attivita.json e riepilogo.json.";
+    msg.className = "";
+  } catch (errore) {
+
+    avviso(errore.name === "AbortError" ? "Salvataggio annullato." : "Salvataggio non riuscito: " + errore.message);
+  } finally {
+    pulsante.disabled = false;
+  }
   $("#f-titolo").focus();
 });
 

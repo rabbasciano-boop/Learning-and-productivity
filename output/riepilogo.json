@@ -1,9 +1,9 @@
 {
-  "attivita_totali": 6,
-  "aperte": 3,
+  "attivita_totali": 8,
+  "aperte": 5,
   "completate": 3,
-  "minuti_residui": 135,
-  "avanzamento_percentuale": 50.0,
+  "minuti_residui": 255,
+  "avanzamento_percentuale": 37.5,
   "attivita_aperte": [
     {
       "id": 1,
@@ -22,6 +22,20 @@
       "titolo": "Leggere capitolo 4",
       "materia": "Economia aziendale",
       "impegno_minuti": 30
+    },
+    {
+      "id": 7,
+      "titolo": "ripasso di storia dell'arte",
+      "materia": "storia dell'arte",
+      "impegno_minuti": 60,
+      "scadenza": "2026-11-10"
+    },
+    {
+      "id": 8,
+      "titolo": "Andare al dentista",
+      "materia": "salute",
+      "impegno_minuti": 60,
+      "scadenza": "2026-11-20"
     }
   ],
   "per_materia": [
@@ -42,6 +56,18 @@
       "totale": 1,
       "completate": 1,
       "minuti_residui": 0
+    },
+    {
+      "materia": "storia dell'arte",
+      "totale": 1,
+      "completate": 0,
+      "minuti_residui": 60
+    },
+    {
+      "materia": "salute",
+      "totale": 1,
+      "completate": 0,
+      "minuti_residui": 60
     }
   ]
 }
